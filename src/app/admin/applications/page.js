@@ -1,429 +1,378 @@
-
 "use client";
-import { useState } from "react";
-import { User, CheckCircle, X, MoreVertical, Eye } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { auth, db } from "@/lib/firebase";
+import { collection, getDocs, doc, updateDoc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { useRouter } from "next/navigation";
+import { Mail, User, CheckCircle, Trash2, Filter, SortAsc, SortDesc, Loader2, Eye } from "lucide-react";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { Timestamp } from "firebase/firestore";
 
-export default function ApplicationsPage() {
-  const [pendingApplications, setPendingApplications] = useState([
-    {
-      id: 1,
-      fullName: "Alex Rodriguez",
-      name: "Alex Rodriguez", // For display
-      email: "alex@example.com",
-      type: "Developer",
-      status: "Pending",
-      appliedDate: "2024-01-16",
-      address: "789 Dev Street",
-      city: "San Francisco",
-      country: "United States",
-      linkedinProfile: "https://linkedin.com/in/alexrodriguez",
-      website: "https://alexrodriguez.dev",
-      whatsappContact: "+1234567890",
-      education: [
-        {
-          degreeName: "Bachelor of Computer Science",
-          institution: "Stanford University",
-          startYear: "2015",
-          endYear: "2019",
-          description: "Specialized in software engineering.",
-        },
-        {
-          degreeName: "Master of AI",
-          institution: "MIT",
-          startYear: "2019",
-          endYear: "2021",
-          description: "Focused on machine learning and AI.",
-        },
-      ],
-      skills: ["React", "Node.js", "Python"],
-      experienceLevel: "Senior (5+ years)",
-      githubLink: "https://github.com/alexrodriguez",
-      portfolioLink: "https://portfolio.alexrodriguez.dev",
-      availability: "Full-time",
-      ndaAccepted: true,
-      termsAccepted: true,
-      privacyAccepted: true,
-    },
-    {
-      id: 2,
-      fullName: "Lisa Wang",
-      name: "Lisa Wang",
-      email: "lisa@example.com",
-      type: "Referral",
-      status: "Pending",
-      appliedDate: "2024-01-15",
-      address: "456 Marketing Ave",
-      city: "New York",
-      country: "United States",
-      linkedinProfile: "https://linkedin.com/in/lisawang",
-      website: "https://lisawang.marketing",
-      whatsappContact: "+1987654321",
-      education: [
-        {
-          degreeName: "Bachelor of Business",
-          institution: "NYU",
-          startYear: "2016",
-          endYear: "2020",
-          description: "Focused on marketing and communications.",
-        },
-      ],
-      hearAboutUs: "Social Media",
-      targetAudience: ["Small Business", "Startups"],
-      marketingChannels: ["Social Media", "Blog"],
-      payoutMethod: "PayPal",
-      termsAccepted: true,
-      privacyAccepted: true,
-    },
-  ]);
-
+export default function AdminApplications() {
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [user, setUser] = useState(null);
+  const [sortField, setSortField] = useState("fullName");
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [actionLoading, setActionLoading] = useState({});
+  const [selectedApp, setSelectedApp] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedApplication, setSelectedApplication] = useState(null);
-  const [editedStatus, setEditedStatus] = useState("");
+  const router = useRouter();
 
-  const handleView = (application) => {
-    setSelectedApplication(application);
-    setEditedStatus(application.status);
-    setIsModalOpen(true);
+  // Check authentication status
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser && currentUser.email && currentUser.email.endsWith("@gmail.com")) {
+        setUser(currentUser);
+      } else {
+        setError("You are not authorized to view this page.");
+        setLoading(false);
+        router.push("/admin/login");
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
+
+  // Fetch applications
+  const fetchApplications = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const querySnapshot = await getDocs(collection(db, "partnerApplications"));
+      const apps = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setApplications(apps);
+      if (apps.length === 0) {
+        setError("No applications found.");
+      }
+    } catch (error) {
+      console.error("Error fetching applications:", {
+        code: error.code || "N/A",
+        message: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString(),
+      });
+      setError("Failed to load applications. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchApplications();
+  }, [fetchApplications]);
+
+  // Sorting and filtering
+  const sortedAndFilteredApps = applications
+    .filter((app) => filterStatus === "all" || app.status === filterStatus)
+    .sort((a, b) => {
+      const aValue = a[sortField] || "";
+      const bValue = b[sortField] || "";
+      return sortOrder === "desc"
+        ? bValue.localeCompare(aValue)
+        : aValue.localeCompare(bValue);
+    });
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
   };
 
-  const handleStatusChange = () => {
-    setPendingApplications((prev) =>
-      prev.map((app) =>
-        app.id === selectedApplication.id ? { ...app, status: editedStatus } : app
-      )
+  const handleViewDetails = async (applicationId) => {
+    try {
+      const docRef = doc(db, "partnerApplications", applicationId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setSelectedApp({ id: docSnap.id, ...docSnap.data() });
+        setIsModalOpen(true);
+      } else {
+        toast.error("Application not found.", { position: "top-right" });
+      }
+    } catch (error) {
+      console.error("Error fetching application details:", {
+        code: error.code || "N/A",
+        message: error.message,
+        stack: error.stack,
+        applicationId,
+        timestamp: new Date().toISOString(),
+      });
+      toast.error("Failed to load application details.", { position: "top-right" });
+    }
+  };
+
+  const handleApprove = async (applicationId) => {
+    if (!confirm("Are you sure you want to approve this application?")) return;
+    if (!user) {
+      toast.error("User not authenticated.", { position: "top-right" });
+      return;
+    }
+    setActionLoading((prev) => ({ ...prev, [applicationId]: "approve" }));
+    try {
+      console.log("Approving application:", { applicationId, userEmail: user.email });
+      const docRef = doc(db, "partnerApplications", applicationId);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        throw new Error("Application not found");
+      }
+      await updateDoc(docRef, {
+        status: "approved", // Changed from "active" to "approved"
+        earnings: "$0",
+        updatedAt: Timestamp.fromDate(new Date()),
+        updatedBy: user.email,
+      });
+      setApplications((prev) =>
+        prev.map((app) =>
+          app.id === applicationId ? { ...app, status: "approved", updatedBy: user.email } : app
+        )
+      );
+      toast.success("Application approved successfully!", { position: "top-right" });
+    } catch (error) {
+      console.error("Error approving application:", {
+        code: error.code || "N/A",
+        message: error.message,
+        stack: error.stack,
+        applicationId,
+        userEmail: user?.email || "N/A",
+        timestamp: new Date().toISOString(),
+      });
+      toast.error(`Failed to approve application: ${error.message}`, { position: "top-right" });
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [applicationId]: null }));
+    }
+  };
+
+  const handleReject = async (applicationId) => {
+    if (!confirm("Are you sure you want to reject this application?")) return;
+    if (!user) {
+      toast.error("User not authenticated.", { position: "top-right" });
+      return;
+    }
+    setActionLoading((prev) => ({ ...prev, [applicationId]: "reject" }));
+    try {
+      console.log("Rejecting application:", { applicationId, userEmail: user.email });
+      const docRef = doc(db, "partnerApplications", applicationId);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        throw new Error("Application not found");
+      }
+      await updateDoc(docRef, {
+        status: "rejected",
+        updatedAt: Timestamp.fromDate(new Date()),
+        updatedBy: user.email,
+      });
+      setApplications((prev) =>
+        prev.map((app) =>
+          app.id === applicationId ? { ...app, status: "rejected", updatedBy: user.email } : app
+        )
+      );
+      toast.success("Application rejected successfully!", { position: "top-right" });
+    } catch (error) {
+      console.error("Error rejecting application:", {
+        code: error.code || "N/A",
+        message: error.message,
+        stack: error.stack,
+        applicationId,
+        userEmail: user?.email || "N/A",
+        timestamp: new Date().toISOString(),
+      });
+      toast.error(`Failed to reject application: ${error.message}`, { position: "top-right" });
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [applicationId]: null }));
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#8BE31F]" />
+      </div>
     );
-    setIsModalOpen(false);
-  };
+  }
 
-  const statusOptions = ["Pending", "Approved", "Rejected"];
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-red-500 text-center text-lg font-medium">{error}</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-black dark:text-white">Partner Applications</h2>
-          <p className="text-gray-600 dark:text-gray-400">Review and manage partner applications</p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
-            {pendingApplications.length} Pending
-          </span>
-        </div>
-      </div>
-
-      {/* Applications List */}
-      <div className="space-y-4">
-        {pendingApplications.map((application) => (
-          <div
-            key={application.id}
-            className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-all duration-300"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-[#8BE31F] to-green-400 rounded-full flex items-center justify-center">
-                    <User className="w-6 h-6 text-black" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-black dark:text-white">{application.name}</h3>
-                    <p className="text-sm text-gray-500">{application.email}</p>
-                  </div>
-                  <span
-                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                      application.type === "Developer" ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"
-                    }`}
-                  >
-                    {application.type} Partner
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Applied Date</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{application.appliedDate}</p>
-                  </div>
-                  {application.type === "Developer" ? (
-                    <>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Experience Level</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{application.experienceLevel || "N/A"}</p>
-                      </div>
-                      <div className="md:col-span-2">
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Skills</p>
-                        <div className="flex flex-wrap gap-2">
-                          {Array.isArray(application.skills) && application.skills.length > 0 ? (
-                            application.skills.map((skill) => (
-                              <span
-                                key={skill}
-                                className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs text-gray-700 dark:text-gray-300"
-                              >
-                                {skill}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-sm text-gray-600 dark:text-gray-400">No skills provided</span>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Target Audience</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {Array.isArray(application.targetAudience) && application.targetAudience.length > 0
-                            ? application.targetAudience.join(", ")
-                            : "N/A"}
-                        </p>
-                      </div>
-                      <div className="md:col-span-2">
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Marketing Channels</p>
-                        <div className="flex flex-wrap gap-2">
-                          {Array.isArray(application.marketingChannels) && application.marketingChannels.length > 0 ? (
-                            application.marketingChannels.map((channel) => (
-                              <span
-                                key={channel}
-                                className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs text-gray-700 dark:text-gray-300"
-                              >
-                                {channel}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-sm text-gray-600 dark:text-gray-400">No channels provided</span>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2 ml-4">
-                <button
-                  onClick={() => handleView(application)}
-                  className="bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center"
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  View Details
-                </button>
-                <button className="text-gray-600 hover:text-gray-900 transition-colors p-2">
-                  <MoreVertical className="w-4 h-4" />
-                </button>
-              </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <ToastContainer />
+      <div className="max-w-7xl mx-auto">
+        <h2 className="text-3xl font-bold text-black dark:text-white mb-8">
+          Partner Applications
+        </h2>
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex space-x-4">
+            <div className="relative">
+              <Filter className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-[#8BE31F] focus:border-[#8BE31F] bg-white dark:bg-gray-700 text-black dark:text-white sm:text-sm"
+              >
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* View Details Modal */}
-      {isModalOpen && selectedApplication && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700 shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-black dark:text-white">{selectedApplication.fullName}'s Application</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">
-                <X className="w-6 h-6" />
-              </button>
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            {applications.length} application(s)
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
+              <tr>
+                <th
+                  onClick={() => handleSort("fullName")}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer"
+                >
+                  Name {sortField === "fullName" && (sortOrder === "asc" ? <SortAsc className="inline h-4 w-4" /> : <SortDesc className="inline h-4 w-4" />)}
+                </th>
+                <th
+                  onClick={() => handleSort("email")}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer"
+                >
+                  Email {sortField === "email" && (sortOrder === "asc" ? <SortAsc className="inline h-4 w-4" /> : <SortDesc className="inline h-4 w-4" />)}
+                </th>
+                <th
+                  onClick={() => handleSort("partnershipType")}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer"
+                >
+                  Partnership Type {sortField === "partnershipType" && (sortOrder === "asc" ? <SortAsc className="inline h-4 w-4" /> : <SortDesc className="inline h-4 w-4" />)}
+                </th>
+                <th
+                  onClick={() => handleSort("status")}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer"
+                >
+                  Status {sortField === "status" && (sortOrder === "asc" ? <SortAsc className="inline h-4 w-4" /> : <SortDesc className="inline h-4 w-4" />)}
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              {sortedAndFilteredApps.map((app) => (
+                <tr key={app.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <User className="h-5 w-5 text-gray-400 mr-2" />
+                      <span className="text-sm font-medium text-black dark:text-white">{app.fullName}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <Mail className="h-4 w-4 text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">{app.email}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{app.partnershipType}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        app.status === "approved"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          : app.status === "rejected"
+                          ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                          : app.status === "pending"
+                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+                      }`}
+                    >
+                      {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={() => handleViewDetails(app.id)}
+                        className="flex items-center px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        View
+                      </button>
+                      {app.status === "pending" && (
+                        <>
+                          <button
+                            onClick={() => handleApprove(app.id)}
+                            disabled={actionLoading[app.id]}
+                            className={`flex items-center px-3 py-1.5 bg-[#8BE31F] text-black rounded-md hover:bg-[#7ACC1B] focus:outline-none focus:ring-2 focus:ring-[#8BE31F] transition-all ${
+                              actionLoading[app.id] === "approve" ? "opacity-50 cursor-not-allowed" : ""
+                            }`}
+                          >
+                            {actionLoading[app.id] === "approve" ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                            )}
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleReject(app.id)}
+                            disabled={actionLoading[app.id]}
+                            className={`flex items-center px-3 py-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all ${
+                              actionLoading[app.id] === "reject" ? "opacity-50 cursor-not-allowed" : ""
+                            }`}
+                          >
+                            {actionLoading[app.id] === "reject" ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Trash2 className="h-4 w-4 mr-2" />
+                            )}
+                            Reject
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {sortedAndFilteredApps.length === 0 && (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              No applications match the selected filter.
             </div>
-
-            <div className="space-y-8">
-              {/* Personal Information */}
-              <section>
-                <h3 className="text-lg font-semibold text-black dark:text-white mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">Personal Information</h3>
-                <dl className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <dt className="font-medium text-gray-700 dark:text-gray-300">Full Name</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.fullName || "N/A"}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-700 dark:text-gray-300">Email</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.email || "N/A"}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-700 dark:text-gray-300">Address</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.address || "N/A"}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-700 dark:text-gray-300">City</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.city || "N/A"}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-700 dark:text-gray-300">Country</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.country || "N/A"}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-700 dark:text-gray-300">LinkedIn Profile</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">
-                      {selectedApplication.linkedinProfile ? (
-                        <a href={selectedApplication.linkedinProfile} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                          {selectedApplication.linkedinProfile}
-                        </a>
-                      ) : "N/A"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-700 dark:text-gray-300">Website</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">
-                      {selectedApplication.website ? (
-                        <a href={selectedApplication.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                          {selectedApplication.website}
-                        </a>
-                      ) : "N/A"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-700 dark:text-gray-300">WhatsApp Contact</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.whatsappContact || "N/A"}</dd>
-                  </div>
-                </dl>
-              </section>
-
-              {/* Education Background */}
-              <section>
-                <h3 className="text-lg font-semibold text-black dark:text-white mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">Education Background</h3>
-                {Array.isArray(selectedApplication.education) && selectedApplication.education.length > 0 ? (
-                  <div className="space-y-4">
-                    {selectedApplication.education.map((edu, index) => (
-                      <div key={index} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <h4 className="font-medium text-gray-900 dark:text-gray-100">{edu.degreeName || "N/A"}</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {edu.institution || "N/A"} ({edu.startYear || "N/A"} - {edu.endYear || "N/A"})
-                        </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{edu.description || "No description provided"}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-600 dark:text-gray-400">No education information provided.</p>
-                )}
-              </section>
-
-              {/* Program Specific Details */}
-              <section>
-                <h3 className="text-lg font-semibold text-black dark:text-white mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">Program Specific Details</h3>
-                <dl className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <dt className="font-medium text-gray-700 dark:text-gray-300">Partnership Type</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.type || "N/A"}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-700 dark:text-gray-300">Applied Date</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.appliedDate || "N/A"}</dd>
-                  </div>
-                  {selectedApplication.type === "Developer" ? (
-                    <>
-                      <div className="md:col-span-2">
-                        <dt className="font-medium text-gray-700 dark:text-gray-300">Skills</dt>
-                        <dd className="text-gray-900 dark:text-gray-100">
-                          {Array.isArray(selectedApplication.skills) && selectedApplication.skills.length > 0
-                            ? selectedApplication.skills.join(", ")
-                            : "N/A"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="font-medium text-gray-700 dark:text-gray-300">Experience Level</dt>
-                        <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.experienceLevel || "N/A"}</dd>
-                      </div>
-                      <div>
-                        <dt className="font-medium text-gray-700 dark:text-gray-300">GitHub Link</dt>
-                        <dd className="text-gray-900 dark:text-gray-100">
-                          {selectedApplication.githubLink ? (
-                            <a href={selectedApplication.githubLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                              {selectedApplication.githubLink}
-                            </a>
-                          ) : "N/A"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="font-medium text-gray-700 dark:text-gray-300">Portfolio Link</dt>
-                        <dd className="text-gray-900 dark:text-gray-100">
-                          {selectedApplication.portfolioLink ? (
-                            <a href={selectedApplication.portfolioLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                              {selectedApplication.portfolioLink}
-                            </a>
-                          ) : "N/A"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="font-medium text-gray-700 dark:text-gray-300">Availability</dt>
-                        <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.availability || "N/A"}</dd>
-                      </div>
-                      <div>
-                        <dt className="font-medium text-gray-700 dark:text-gray-300">NDA Accepted</dt>
-                        <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.ndaAccepted ? "Yes" : "No"}</dd>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <dt className="font-medium text-gray-700 dark:text-gray-300">Heard About Us</dt>
-                        <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.hearAboutUs || "N/A"}</dd>
-                      </div>
-                      <div className="md:col-span-2">
-                        <dt className="font-medium text-gray-700 dark:text-gray-300">Target Audience</dt>
-                        <dd className="text-gray-900 dark:text-gray-100">
-                          {Array.isArray(selectedApplication.targetAudience) && selectedApplication.targetAudience.length > 0
-                            ? selectedApplication.targetAudience.join(", ")
-                            : "N/A"}
-                        </dd>
-                      </div>
-                      <div className="md:col-span-2">
-                        <dt className="font-medium text-gray-700 dark:text-gray-300">Marketing Channels</dt>
-                        <dd className="text-gray-900 dark:text-gray-100">
-                          {Array.isArray(selectedApplication.marketingChannels) && selectedApplication.marketingChannels.length > 0
-                            ? selectedApplication.marketingChannels.join(", ")
-                            : "N/A"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="font-medium text-gray-700 dark:text-gray-300">Payout Method</dt>
-                        <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.payoutMethod || "N/A"}</dd>
-                      </div>
-                    </>
-                  )}
-                </dl>
-              </section>
-
-              {/* Agreements */}
-              <section>
-                <h3 className="text-lg font-semibold text-black dark:text-white mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">Agreements</h3>
-                <dl className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <dt className="font-medium text-gray-700 dark:text-gray-300">Terms Accepted</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.termsAccepted ? "Yes" : "No"}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-700 dark:text-gray-300">Privacy Accepted</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">{selectedApplication.privacyAccepted ? "No" : "No"}</dd>
-                  </div>
-                </dl>
-              </section>
-
-              {/* Status Update */}
-              <section>
-                <h3 className="text-lg font-semibold text-black dark:text-white mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">Update Application Status</h3>
-                <div className="flex items-center space-x-4">
-                  <select
-                    value={editedStatus}
-                    onChange={(e) => setEditedStatus(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#8BE31F] focus:border-transparent bg-white dark:bg-gray-700 text-black dark:text-white"
-                  >
-                    {statusOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={handleStatusChange}
-                    className="bg-[#8BE31F] text-black px-4 py-2 rounded-lg font-medium hover:bg-[#7ACC1B] transition-colors flex items-center"
-                  >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Update Status
-                  </button>
-                </div>
-              </section>
+          )}
+        </div>
+      </div>
+      {/* Modal for Application Details */}
+      {isModalOpen && selectedApp && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-lg w-full mx-4">
+            <h3 className="text-xl font-bold text-black dark:text-white mb-4">Application Details</h3>
+            <div className="space-y-3">
+              <p><strong>ID:</strong> {selectedApp.id}</p>
+              <p><strong>Full Name:</strong> {selectedApp.fullName}</p>
+              <p><strong>Email:</strong> {selectedApp.email}</p>
+              <p><strong>Partnership Type:</strong> {selectedApp.partnershipType}</p>
+              <p><strong>Status:</strong> {selectedApp.status.charAt(0).toUpperCase() + selectedApp.status.slice(1)}</p>
+              <p><strong>Updated By:</strong> {selectedApp.updatedBy || "N/A"}</p>
+              <p><strong>Updated At:</strong> {selectedApp.updatedAt ? new Date(selectedApp.updatedAt.toDate()).toLocaleString() : "N/A"}</p>
+              <p><strong>Created At:</strong> {selectedApp.createdAt ? new Date(selectedApp.createdAt.toDate()).toLocaleString() : "N/A"}</p>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
