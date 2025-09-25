@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { auth, db } from "@/lib/firebase";
 import {
   createUserWithEmailAndPassword,
@@ -115,7 +115,7 @@ export default function Signup() {
     });
 
     let intervalId;
-    if (user && !isEmailVerified) {
+    if (user && !user.emailVerified) {
       intervalId = setInterval(async () => {
         try {
           await user.reload();
@@ -135,13 +135,69 @@ export default function Signup() {
     };
   }, [user]);
 
+  const validateStep = useCallback(
+    (step) => {
+      const newErrors = {};
+
+      switch (step) {
+        case 1:
+          if (!formData.fullName.trim()) newErrors.fullName = "Full name is required";
+          if (!formData.email.trim()) newErrors.email = "Email is required";
+          if (!formData.email.includes("@")) newErrors.email = "Valid email is required";
+          if (!formData.password) newErrors.password = "Password is required";
+          if (formData.password.length < 6) newErrors.password = "Password must be at least 6 characters";
+          if (formData.password !== formData.confirmPassword)
+            newErrors.confirmPassword = "Passwords do not match";
+          break;
+
+        case 2:
+          if (!formData.partnershipType) newErrors.partnershipType = "Please select a partnership type";
+          break;
+
+        case 3:
+          if (!formData.address.trim()) newErrors.address = "Address is required";
+          if (!formData.city.trim()) newErrors.city = "City is required";
+          if (!formData.country) newErrors.country = "Country is required";
+          if (!formData.whatsappContact.trim()) newErrors.whatsappContact = "WhatsApp contact is required";
+          break;
+
+        case 4:
+          if (formData.partnershipType === "developer") {
+            if (!formData.education[0].degreeName.trim())
+              newErrors.education = "At least one education entry is required for developers";
+          }
+          break;
+
+        case 5:
+          if (formData.partnershipType === "referral") {
+            if (!formData.hearAboutUs) newErrors.hearAboutUs = "Please select how you heard about us";
+            if (!formData.payoutMethod) newErrors.payoutMethod = "Please select a payout method";
+          } else {
+            if (formData.skills.length === 0) newErrors.skills = "Please select at least one skill";
+            if (!formData.experienceLevel) newErrors.experienceLevel = "Please select your experience level";
+            if (!formData.ndaAccepted) newErrors.ndaAccepted = "NDA acceptance is required for developers";
+          }
+          break;
+
+        case 6:
+          if (!formData.termsAccepted) newErrors.termsAccepted = "You must accept the terms and conditions";
+          if (!formData.privacyAccepted) newErrors.privacyAccepted = "You must accept the privacy policy";
+          break;
+      }
+
+      setErrors(newErrors);
+      return Object.keys(newErrors).length === 0;
+    },
+    [formData]
+  );
+
   useEffect(() => {
     if (currentStep === 1 && isEmailVerified && validateStep(1)) {
       setCurrentStep(2);
       setMessage("Email verified! Proceeding to partnership type selection.");
       localStorage.removeItem("partnerSignupForm");
     }
-  }, [isEmailVerified]);
+  }, [currentStep, isEmailVerified, validateStep]);
 
   const totalSteps = 6;
 
@@ -277,59 +333,6 @@ export default function Signup() {
     }));
   };
 
-  const validateStep = (step) => {
-    const newErrors = {};
-
-    switch (step) {
-      case 1:
-        if (!formData.fullName.trim()) newErrors.fullName = "Full name is required";
-        if (!formData.email.trim()) newErrors.email = "Email is required";
-        if (!formData.email.includes("@")) newErrors.email = "Valid email is required";
-        if (!formData.password) newErrors.password = "Password is required";
-        if (formData.password.length < 6) newErrors.password = "Password must be at least 6 characters";
-        if (formData.password !== formData.confirmPassword)
-          newErrors.confirmPassword = "Passwords do not match";
-        break;
-
-      case 2:
-        if (!formData.partnershipType) newErrors.partnershipType = "Please select a partnership type";
-        break;
-
-      case 3:
-        if (!formData.address.trim()) newErrors.address = "Address is required";
-        if (!formData.city.trim()) newErrors.city = "City is required";
-        if (!formData.country) newErrors.country = "Country is required";
-        if (!formData.whatsappContact.trim()) newErrors.whatsappContact = "WhatsApp contact is required";
-        break;
-
-      case 4:
-        if (formData.partnershipType === "developer") {
-          if (!formData.education[0].degreeName.trim())
-            newErrors.education = "At least one education entry is required for developers";
-        }
-        break;
-
-      case 5:
-        if (formData.partnershipType === "referral") {
-          if (!formData.hearAboutUs) newErrors.hearAboutUs = "Please select how you heard about us";
-          if (!formData.payoutMethod) newErrors.payoutMethod = "Please select a payout method";
-        } else {
-          if (formData.skills.length === 0) newErrors.skills = "Please select at least one skill";
-          if (!formData.experienceLevel) newErrors.experienceLevel = "Please select your experience level";
-          if (!formData.ndaAccepted) newErrors.ndaAccepted = "NDA acceptance is required for developers";
-        }
-        break;
-
-      case 6:
-        if (!formData.termsAccepted) newErrors.termsAccepted = "You must accept the terms and conditions";
-        if (!formData.privacyAccepted) newErrors.privacyAccepted = "You must accept the privacy policy";
-        break;
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const nextStep = () => {
     if (validateStep(currentStep)) {
       setCurrentStep((prev) => Math.min(prev + 1, totalSteps));
@@ -410,7 +413,7 @@ export default function Signup() {
           submittedAt: new Date(),
         });
 
-        setMessage("Application submitted successfully! You'll receive a confirmation soon.");
+        setMessage("Application submitted successfully! You&apos;ll receive a confirmation soon.");
         setShowModal(true);
 
         setTimeout(() => {
@@ -561,7 +564,7 @@ export default function Signup() {
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold text-black dark:text-white mb-4">Select Partnership Type</h2>
-              <p className="text-gray-600 dark:text-gray-400">Choose how you'd like to partner with us</p>
+              <p className="text-gray-600 dark:text-gray-400">Choose how you&apos;d like to partner with us</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {partnershipTypes.map((type) => {
@@ -1099,10 +1102,10 @@ export default function Signup() {
               <div className="bg-[#8BE31F]/10 border border-[#8BE31F]/20 rounded-lg p-6">
                 <div className="flex items-center mb-4">
                   <Star className="w-6 h-6 text-[#8BE31F] mr-2" />
-                  <h4 className="text-lg font-semibold text-black dark:text-white">You're Almost Ready!</h4>
+                  <h4 className="text-lg font-semibold text-black dark:text-white">You&apos;re Almost Ready!</h4>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Once you submit this application, our team will review it within 24-48 hours. You'll receive an email
+                  Once you submit this application, our team will review it within 24-48 hours. You&apos;ll receive an email
                   with your partner dashboard access and next steps.
                 </p>
                 <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
@@ -1129,7 +1132,7 @@ export default function Signup() {
                 Your Application is in Process
               </h2>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Thank you for submitting your application! Our team will review it within 24-48 hours. You'll be redirected to the login page shortly.
+                Thank you for submitting your application! Our team will review it within 24-48 hours. You&apos;ll be redirected to the login page shortly.
               </p>
               <button
                 onClick={() => {

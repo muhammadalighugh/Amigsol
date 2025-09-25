@@ -274,7 +274,7 @@ export default function PartnerDashboard() {
           </p>
           {userData?.status === "pending" && (
             <p className="text-yellow-500 text-sm mt-2">
-              Your application is pending review. We'll notify you once approved.
+              Your application is pending review. We&apos;ll notify you once approved.
             </p>
           )}
           {userData?.status === "approved" && (

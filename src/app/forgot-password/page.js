@@ -116,8 +116,8 @@ export default function ForgotPasswordPage() {
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
             {isEmailSent 
-              ? 'We\'ve sent password reset instructions to your email'
-              : 'No worries, we\'ll send you reset instructions'
+              ? 'We&apos;ve sent password reset instructions to your email'
+              : 'No worries, we&apos;ll send you reset instructions'
             }
           </p>
         </div>
@@ -168,7 +168,7 @@ export default function ForgotPasswordPage() {
                       Password Reset Instructions
                     </p>
                     <p className="text-blue-700 dark:text-blue-300 text-xs">
-                      Enter your email address and we'll send you a link to reset your password. 
+                      Enter your email address and we&apos;ll send you a link to reset your password. 
                       The link will expire in 24 hours for security.
                     </p>
                   </div>
@@ -214,7 +214,7 @@ export default function ForgotPasswordPage() {
                   Reset Email Sent!
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  We've sent password reset instructions to:
+                  We&apos;ve sent password reset instructions to:
                 </p>
                 <p className="text-[#8BE31F] font-medium mt-1">
                   {formData.email}

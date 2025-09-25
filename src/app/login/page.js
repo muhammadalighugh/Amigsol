@@ -1,10 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
+  sendEmailVerification,
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
@@ -25,13 +26,12 @@ export default function LoginPage() {
     rememberMe: false,
   });
   const router = useRouter();
-  const { theme } = useTheme();
+  const { theme } = useTheme(); // Consider removing if unused
 
   useEffect(() => {
     setMounted(true);
     setTimeout(() => setIsVisible(true), 100);
 
-    // Check if user is already logged in
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user && user.emailVerified) {
         router.push("/user");
@@ -40,12 +40,11 @@ export default function LoginPage() {
     return () => unsubscribe();
   }, [router]);
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = useCallback((field, value) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
-
     if (errors[field]) {
       setErrors((prev) => ({
         ...prev,
@@ -53,48 +52,38 @@ export default function LoginPage() {
       }));
     }
     setMessage("");
-  };
+  }, [errors]);
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     const newErrors = {};
-
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
-    } else if (!formData.email.includes("@")) {
+    } else if (!emailRegex.test(formData.email)) {
       newErrors.email = "Please enter a valid email address";
     }
-
     if (!formData.password) {
       newErrors.password = "Password is required";
     } else if (formData.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
+  }, [formData]);
 
-  const handleLogin = async () => {
+  const handleLogin = useCallback(async () => {
     if (!validateForm()) return;
-
     setIsLoading(true);
     setMessage("");
-
+    let userCredential;
     try {
       await setPersistence(auth, formData.rememberMe ? browserLocalPersistence : browserSessionPersistence);
-
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
-
+      userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
       if (!userCredential.user.emailVerified) {
         setErrors({ general: "Please verify your email before logging in. Check your inbox or spam folder." });
         await auth.signOut();
         return;
       }
-
       setMessage("Login successful! Redirecting to dashboard...");
       router.push("/user");
     } catch (error) {
@@ -126,17 +115,30 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [formData, validateForm, router]);
 
-  const handleForgotPassword = async () => {
+  const handleResendVerification = useCallback(async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      setErrors({ general: "No user is currently signed in." });
+      return;
+    }
+    try {
+      await sendEmailVerification(user);
+      setMessage("Verification email resent! Please check your inbox and spam folder.");
+    } catch (error) {
+      setErrors({ general: `Failed to resend verification email: ${error.message}` });
+      console.error("Resend verification error:", error);
+    }
+  }, []);
+
+  const handleForgotPassword = useCallback(async () => {
     if (!formData.email.trim() || !formData.email.includes("@")) {
       setErrors({ email: "Please enter a valid email address" });
       return;
     }
-
     setIsLoading(true);
     setMessage("");
-
     try {
       await sendPasswordResetEmail(auth, formData.email);
       setMessage("Password reset email sent! Please check your inbox and spam folder.");
@@ -163,7 +165,7 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [formData.email]);
 
   if (!mounted) {
     return (
@@ -176,7 +178,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 sm:px-6 lg:px-8">
       <div className={`max-w-md w-full transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}>
-        {/* Logo/Brand Section */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-[#8BE31F] to-green-400 rounded-2xl mb-4">
             <Building className="w-8 h-8 text-black" />
@@ -185,10 +186,8 @@ export default function LoginPage() {
           <p className="text-gray-600 dark:text-gray-400">Access your partner dashboard</p>
         </div>
 
-        {/* Login Form */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
           <div className="space-y-6">
-            {/* Messages */}
             {message && (
               <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                 <p className="text-green-600 dark:text-green-400 text-sm">{message}</p>
@@ -197,10 +196,18 @@ export default function LoginPage() {
             {errors.general && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                 <p className="text-red-600 dark:text-red-400 text-sm">{errors.general}</p>
+                {errors.general.includes("verify your email") && (
+                  <button
+                    onClick={handleResendVerification}
+                    className="text-sm text-[#8BE31F] hover:text-[#7ACC1B] font-medium transition-colors mt-2"
+                    aria-label="Resend verification email"
+                  >
+                    Resend Verification Email
+                  </button>
+                )}
               </div>
             )}
 
-            {/* Email Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Email Address
@@ -216,12 +223,14 @@ export default function LoginPage() {
                   }`}
                   placeholder="Enter your email"
                   disabled={isLoading}
+                  aria-describedby={errors.email ? "email-error" : undefined}
                 />
               </div>
-              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+              {errors.email && (
+                <p id="email-error" className="text-red-500 text-sm mt-1">{errors.email}</p>
+              )}
             </div>
 
-            {/* Password Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Password
@@ -237,20 +246,23 @@ export default function LoginPage() {
                   }`}
                   placeholder="Enter your password"
                   disabled={isLoading}
+                  aria-describedby={errors.password ? "password-error" : undefined}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                   disabled={isLoading}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
+              {errors.password && (
+                <p id="password-error" className="text-red-500 text-sm mt-1">{errors.password}</p>
+              )}
             </div>
 
-            {/* Remember Me & Forgot Password */}
             <div className="flex items-center justify-between">
               <label className="flex items-center">
                 <input
@@ -268,12 +280,12 @@ export default function LoginPage() {
                 onClick={handleForgotPassword}
                 className="text-sm text-[#8BE31F] hover:text-[#7ACC1B] font-medium transition-colors"
                 disabled={isLoading}
+                aria-label="Reset password"
               >
                 Forgot password?
               </button>
             </div>
 
-            {/* Login Button */}
             <button
               onClick={handleLogin}
               disabled={isLoading}
@@ -298,13 +310,13 @@ export default function LoginPage() {
             </button>
           </div>
 
-          {/* Sign Up Link */}
           <div className="mt-6 text-center">
             <p className="text-gray-600 dark:text-gray-400 text-sm">
               Don&apos;t have an account?{" "}
               <button
                 onClick={() => router.push("/signup")}
                 className="text-[#8BE31F] hover:text-[#7ACC1B] font-medium transition-colors"
+                aria-label="Sign up as a partner"
               >
                 Join as Partner
               </button>
