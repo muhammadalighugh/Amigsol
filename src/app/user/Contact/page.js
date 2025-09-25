@@ -103,21 +103,15 @@ export default function ContactAdmin() {
 
   return (
     <div className="min-h-screen">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="mx-auto px-4 sm:px-2">
         
         {/* Header Section */}
         
 
         {/* Admin Info Card */}
-        <div className={`mb-12 transition-all duration-1000 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <div className="bg-white/10 dark:bg-gray-800/20 rounded-3xl p-8 backdrop-blur-sm border border-gray-200/20 dark:border-gray-700/20 hover:border-[#8BE31F]/30 transition-all duration-300">
-            <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-gradient-to-r from-[#8BE31F] to-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <User className="w-10 h-10 text-black" />
-              </div>
-              <h2 className="text-2xl font-bold text-black dark:text-white mb-2">{adminContact.name}</h2>
+        <div className={`mb-4 transition-all duration-1000 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+          <div className="bg-white/10 dark:bg-gray-800/20 rounded-2xl p-4 backdrop-blur-sm border border-gray-200/20 dark:border-gray-700/20 hover:border-[#8BE31F]/30 transition-all duration-300">
             
-            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">

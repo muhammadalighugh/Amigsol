@@ -353,7 +353,7 @@ export default function AdminApplications() {
       </div>
       {/* Modal for Application Details */}
       {isModalOpen && selectedApp && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-lg w-full mx-4">
             <h3 className="text-xl font-bold text-black dark:text-white mb-4">Application Details</h3>
             <div className="space-y-3">

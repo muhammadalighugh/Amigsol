@@ -218,22 +218,9 @@ export default function PartnersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <ToastContainer />
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-        <div>
-          <h2 className="text-2xl font-bold text-black dark:text-white">Partners</h2>
-          <p className="text-gray-600 dark:text-gray-400">Manage all your partners</p>
-        </div>
-        <button onClick={handleAdd} className="bg-[#8BE31F] text-black px-4 py-2 rounded-lg font-medium hover:bg-[#7ACC1B] transition-colors flex items-center">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Partner
-        </button>
-      </div>
-
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-wrap gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -268,8 +255,12 @@ export default function PartnersPage() {
             <Download className="w-4 h-4 mr-2" />
             Export
           </button>
+          <button onClick={handleAdd} className="bg-[#8BE31F] text-black px-4 py-2 rounded-lg font-medium hover:bg-[#7ACC1B] transition-colors flex items-center">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Partner
+        </button>
         </div>
-      </div>
+      
 
       {/* Partners Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -333,9 +324,7 @@ export default function PartnersPage() {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button className="text-gray-600 hover:text-gray-900 transition-colors">
-                        <Edit className="w-4 h-4" />
-                      </button>
+                      
                       <button onClick={() => handleDelete(partner.id)} className="text-red-600 hover:text-red-900 transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -350,7 +339,7 @@ export default function PartnersPage() {
 
       {/* Modal */}
       {isModalOpen && formData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700 shadow-2xl">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-black dark:text-white">

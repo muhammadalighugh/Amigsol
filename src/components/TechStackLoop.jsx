@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import {
   Code2,
   Database,
@@ -43,8 +42,27 @@ export default function ProfessionalTechStackLoop() {
     { name: "Express.js", icon: Server, category: "Backend" }
   ];
 
-  // Create enough copies for truly seamless infinite scroll
-  const duplicatedTechs = [...technologies, ...technologies, ...technologies, ...technologies, ...technologies];
+  // Create enough copies for seamless infinite scroll
+  const duplicatedTechs = [...technologies, ...technologies, ...technologies];
+
+  // Render a single tech item to avoid repetition
+  const renderTechItem = (tech, index, keyPrefix) => {
+    const Icon = tech.icon;
+    return (
+      <div
+        key={`${keyPrefix}-${index}`}
+        className="flex-shrink-0 flex items-center space-x-4 py-4 px-6 pointer-events-none select-none"
+      >
+        <Icon className="h-8 w-8 text-gray-700 dark:text-[#8BE31F]" />
+        <span className="text-xl font-semibold whitespace-nowrap text-gray-800 dark:text-white">
+          {tech.name}
+        </span>
+        <span className="text-sm px-3 py-1 rounded-full bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+          {tech.category}
+        </span>
+      </div>
+    );
+  };
 
   return (
     <div className="w-full transition-colors duration-500 py-8 md:py-2 overflow-hidden relative">
@@ -57,65 +75,17 @@ export default function ProfessionalTechStackLoop() {
 
       {/* First Row - Left to Right */}
       <div className="flex items-center space-x-12 mb-5 animate-scroll-left">
-        {duplicatedTechs.slice(0, 20).map((tech, index) => {
-          const Icon = tech.icon;
-          return (
-            <div
-              key={`row1-${index}`}
-              className="flex-shrink-0 flex items-center space-x-4 py-4 px-6 pointer-events-none select-none"
-            >
-              <Icon className="h-8 w-8 text-gray-700 dark:text-[#8BE31F]" />
-              <span className="text-xl font-semibold whitespace-nowrap text-gray-800 dark:text-white">
-                {tech.name}
-              </span>
-              <span className="text-sm px-3 py-1 rounded-full bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                {tech.category}
-              </span>
-            </div>
-          );
-        })}
+        {duplicatedTechs.slice(0, 20).map((tech, index) => renderTechItem(tech, index, `row1`))}
       </div>
 
       {/* Second Row - Right to Left */}
-      <div className="flex items-center space-x-1 mb-5 animate-scroll-right">
-        {duplicatedTechs.slice(20, 80).map((tech, index) => {
-          const Icon = tech.icon;
-          return (
-            <div
-              key={`row2-${index}`}
-              className="flex-shrink-0 flex items-center space-x-4 py-4 px-6 pointer-events-none select-none"
-            >
-              <Icon className="h-8 w-8 text-gray-700 dark:text-[#8BE31F]" />
-              <span className="text-xl font-semibold whitespace-nowrap text-gray-800 dark:text-white">
-                {tech.name}
-              </span>
-              <span className="text-sm px-3 py-1 rounded-full bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                {tech.category}
-              </span>
-            </div>
-          );
-        })}
+      <div className="flex items-center space-x-12 mb-5 animate-scroll-right">
+        {duplicatedTechs.slice(20, 40).map((tech, index) => renderTechItem(tech, index, `row2`))}
       </div>
 
       {/* Third Row - Left to Right */}
-      <div className="flex items-center lg:space-x-30 sm:space-x-0 animate-scroll-left-slow">
-        {duplicatedTechs.slice(40, 100).map((tech, index) => {
-          const Icon = tech.icon;
-          return (
-            <div
-              key={`row3-${index}`}
-              className="flex-shrink-0 flex items-center space-x-4 py-4 px-6 pointer-events-none select-none"
-            >
-              <Icon className="h-8 w-8 text-gray-700 dark:text-[#8BE31F]" />
-              <span className="text-xl font-semibold whitespace-nowrap text-gray-800 dark:text-white">
-                {tech.name}
-              </span>
-              <span className="text-sm px-3 py-1 rounded-full bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                {tech.category}
-              </span>
-            </div>
-          );
-        })}
+      <div className="flex items-center lg:space-x-30 sm:space-x-12 animate-scroll-left-slow">
+        {duplicatedTechs.slice(40, 60).map((tech, index) => renderTechItem(tech, index, `row3`))}
       </div>
 
       <style jsx>{`
@@ -123,25 +93,20 @@ export default function ProfessionalTechStackLoop() {
           from { transform: translateX(0); }
           to { transform: translateX(-20%); }
         }
-        
         @keyframes scroll-right {
           from { transform: translateX(-20%); }
           to { transform: translateX(0); }
         }
-        
         @keyframes scroll-left-slow {
           from { transform: translateX(0); }
           to { transform: translateX(-20%); }
         }
-        
         .animate-scroll-left {
           animation: scroll-left 60s linear infinite;
         }
-        
         .animate-scroll-right {
           animation: scroll-right 50s linear infinite;
         }
-        
         .animate-scroll-left-slow {
           animation: scroll-left-slow 70s linear infinite;
         }

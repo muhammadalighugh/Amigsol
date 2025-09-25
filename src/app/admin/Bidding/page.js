@@ -436,22 +436,10 @@ export default function ProfessionalProjectBidding() {
       />
       
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <Building className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Project Bidding Dashboard
-                </h1>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Digital Marketing Agency - Project Management
-                </p>
-              </div>
-            </div>
+           
             <button
               onClick={() => {
                 setShowCreateForm(true);
@@ -758,7 +746,7 @@ export default function ProfessionalProjectBidding() {
 
       {/* Create/Edit Project Modal */}
       {showCreateForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between">
